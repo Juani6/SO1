@@ -1,0 +1,8 @@
+GIT
+~/ > git init    Crea un repositorio
+~/ > git clone   
+~/ > git status  Muestra los cambios no guardados.
+~/ > git add (nombre) agrega un archivo y lo deja stageado
+~/ > git commit 
+~/ > git log
+~/ > git rm te mata en la vida real

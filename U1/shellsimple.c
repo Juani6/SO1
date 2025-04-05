@@ -8,7 +8,7 @@
 int main() {
     int status;
     char buff[MAX], *token, *tokensArr[MAX];
-    char path[MAX + 5] = "/bin/";
+    char path[MAX] = "/bin/";
     const char EXITCMD[] = "exit";
 
     while(1) {
@@ -19,7 +19,7 @@ int main() {
         
         if(strcmp(buff,EXITCMD) == 0) 
             return 0;
-        
+
         __pid_t pid = fork();
         if (pid == 0) {
             if (strlen(buff) == 0)
