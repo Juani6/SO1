@@ -51,13 +51,7 @@ int main() {
             }
 
             tokensArr[i] = NULL;
-            /*
-            strcat(path,tokensArr[0]);
-            int error = execv(path, tokensArr);
             
-            if (error == -1)
-                exit(0); 
-            */
             executar(tokensArr);
         }
         else {

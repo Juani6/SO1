@@ -1,5 +1,0 @@
-el programa va a recibir un argumento y debe tener al menos dos procesos
-dado el N > 3 tiene que imprimir de a 3 elementos 
-supongamos que N = 20, el programa tiene que imprimir por pantalla 3 numeros de 1 a 20 no puede repetir los numeros y los tiene que quemar todos
-uno puede hacer un shuffle y el otro elegir
-tambien podemos tomar n procesos y dividir el intervalo en n elementos y que cada proceso muestre N/n elementos
