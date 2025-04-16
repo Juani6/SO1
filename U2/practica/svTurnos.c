@@ -20,6 +20,8 @@
 
 struct epoll_event ev, events[MAX];
 int mem,epollfd,nfds;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_t threads[MAX];
 
 void quit(char* s) {
   perror(s);
@@ -49,7 +51,7 @@ int fd_readline(int fd, char *buf)
 }
 
 
-void* handle_conn(void* csock)
+void handle_conn(int csock)
 {
   char buf[200];
   int rc;
@@ -57,82 +59,48 @@ void* handle_conn(void* csock)
   
   while (1) {
     /* Atendemos pedidos, uno por linea */
-    rc = fd_readline(*(int*)csock, buf);
+    rc = fd_readline(csock, buf);
     if (rc < 0)
     quit("read... raro");
     
     if (rc == 0) {
       /* linea vacia, se cerró la conexión */
-      close(*(int*)csock);
-      pthread_exit(0);
+      close(csock);
     }
     
-    if (!strcmp(buf, "NUEVO")) {
+    if (!strcmp(buf, "hola")) {
       /*si son iguales pasa esto, caso contrario ni idea*/
       char reply[20];
+      
       sprintf(reply, "%d\n", mem);
+      pthread_mutex_lock(&mutex);
       mem++; 
-      write(*(int*)csock, reply, strlen(reply));
-    } else if (!strcmp(buf, "CHAU")) {
-      close(*(int*)csock);
-      pthread_exit(0);
+      pthread_mutex_unlock(&mutex);
+      write(csock, reply, strlen(reply));
+    } else if (!strcmp(buf, "chau")) {
+      close(csock);
     }
-  }
+    pthread_exit(0);
+  } 
 }
 
 // struct epollevent* -> handle
-void handle_threads(struct epoll_event* eventos) {
-  pthread_t threads[MAX];
+/* void handle_threads(struct epoll_event* eventos) {
   for (int i = 0; i < MAX; i++) {
     pthread_create(threads+i,NULL,handle_conn,&(eventos[i].data.fd));
   }
-}
+} */
 
-void wait_for_clients(int lsock)
+void* wait_for_clients(void* lsock)
 {
-  
   int csock;
-  epollfd = epoll_create1(0);
-  if (epollfd == -1) {
-      perror("epoll_create1");
-      exit(EXIT_FAILURE);
+  csock = accept(*(int*)lsock, NULL, NULL);
+  if (csock < 0) 
+    quit("accept");
+  else {
+    handle_conn(csock);
   }
-
-  ev.events = EPOLLIN;
-  ev.data.fd = lsock;
-  if (epoll_ctl(epollfd, EPOLL_CTL_ADD, lsock, &ev) == -1) {
-      perror("epoll_ctl: listen_sock");
-      exit(EXIT_FAILURE);
-  }
-
-  for (;;) {
-    nfds = epoll_wait(epollfd, events, MAX, -1);
-    if (nfds == -1) {
-        perror("epoll_wait");
-        exit(EXIT_FAILURE);
-    }
-    for (int n = 0; n < nfds; ++n) {
-        if (events[n].data.fd == lsock) {
-            csock = accept(lsock,
-                               (struct sockaddr *) NULL, NULL);
-            if (csock == -1) {
-                perror("accept");
-                exit(EXIT_FAILURE);
-            }
-            //  setnonblocking(csock);
-            ev.events = EPOLLIN | EPOLLET;
-            ev.data.fd = csock;
-            if (epoll_ctl(epollfd, EPOLL_CTL_ADD, csock,
-                        &ev) == -1) {
-                perror("epoll_ctl: conn_sock");
-                exit(EXIT_FAILURE);
-            }
-        } else {
-            handle_threads(events);
-        }
-    }
-  }
-
+  pthread_exit(0);
 }
 
 /* Crea un socket de escucha en puerto 4040 TCP */
@@ -175,7 +143,33 @@ int main()
   mem = 0;  
   // printf("Primer valor: %d\n", *num);
   lsock = mk_lsock();
-  wait_for_clients(lsock);
 
+  epollfd = epoll_create1(0);
+  if (epollfd == -1) {
+      perror("epoll_create1");
+      exit(EXIT_FAILURE);
+  }
+
+  ev.events = EPOLLIN;
+  ev.data.fd = lsock;
+  if (epoll_ctl(epollfd, EPOLL_CTL_ADD, lsock, &ev) == -1) {
+      perror("epoll_ctl: listen_sock");
+      exit(EXIT_FAILURE);
+  }
+
+  for (;;) {
+    nfds = epoll_wait(epollfd, events, MAX, -1);
+    if (nfds == -1) {
+        perror("epoll_wait");
+        exit(EXIT_FAILURE);
+    }
+    for (int n = 0; n < nfds; ++n) {
+        if (events[n].data.fd == lsock) {
+            pthread_create(threads+n,NULL,wait_for_clients,&lsock);
+        } 
+    }
+  }
+
+  //wait_for_clients(lsock);
   return 0;
 }
