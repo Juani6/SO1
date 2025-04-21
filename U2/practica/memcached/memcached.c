@@ -15,13 +15,40 @@
 #include <fcntl.h>
 
 #include <sys/epoll.h>
-#define MAX 10
 
+#define MAX 2
+#define DIR 3942
 
 struct epoll_event ev, events[MAX];
 int mem,epollfd,nfds;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_t threads[MAX];
+
+char* tabla[MAX];
+volatile int cantElems;
+
+/**
+ * Funcion de hash para strings propuesta por Kernighan & Ritchie en "The C
+ * Programming Language (Second Ed.)".
+ */
+unsigned KRHash(char *s) {
+  unsigned hashval;
+  for (hashval = 0; *s != '\0'; ++s) {
+    hashval = *s + 31 * hashval;
+  }
+  return hashval;
+}
+
+int parser(char* buff,char** tokensArr, char* div) {
+  int i = 0;
+  char* token;
+  for(token = strtok(buff,div); token != NULL || i < 3; i++) {
+          tokensArr[i] = token;
+          token = strtok(NULL,div);
+      }
+      tokensArr[i] = NULL;
+  return i;
+}
 
 void quit(char* s) {
   perror(s);
@@ -49,14 +76,25 @@ int fd_readline(int fd, char *buf)
   buf[i] = 0;
   return i;
 }
-
+/* 
+PUT k v: introduce al store el valor v bajo la clave k. El valor viejo para k, si exist´ıa, es pisado. El
+servidor debe responder con OK.
+DEL k: Borra el valor asociado a la clave k. El servidor debe responder con OK.
+GET k: Busca el valor asociado a la clave k. El servidor debe contestar con OK v si el valor es v, o
+con NOTFOUND si no hay valor asociado a k
+*/
 
 void handle_conn(int csock)
 {
   char buf[200];
   int rc;
+  char* parsedArr[2];
+  int resParse;
+  unsigned indice;
+  int iterador = 1;
+  char reply[20];
   
-  
+
   while (1) {
     /* Atendemos pedidos, uno por linea */
     rc = fd_readline(csock, buf);
@@ -67,19 +105,43 @@ void handle_conn(int csock)
       /* linea vacia, se cerró la conexión */
       close(csock);
     }
-    
-    if (!strcmp(buf, "hola")) {
-      /*si son iguales pasa esto, caso contrario ni idea*/
-      char reply[20];
-      
-      pthread_mutex_lock(&mutex);
-      sprintf(reply, "%d\n", mem);
-      mem++; 
-      write(csock, reply, strlen(reply));
-      pthread_mutex_unlock(&mutex);
-    } else if (!strcmp(buf, "chau")) {
-      close(csock);
-    }
+    resParse = parser(buf,parsedArr," ");
+      if(parsedArr[1])
+        indice = KRHash(parsedArr[1]) % MAX;
+      if (!strcmp(parsedArr[0],"DEL") && cantElems > 0) {
+        // Eliminar k de la hash
+        pthread_mutex_lock(&mutex);
+        tabla[indice] = NULL;
+        pthread_mutex_unlock(&mutex);
+        cantElems--;
+        sprintf(reply,"%s\n", "OK");
+        write(csock,reply,strlen(reply));
+      }
+      else if (!strcmp(parsedArr[0],"GET")) {
+        
+        sprintf(reply, "%s\n", tabla[indice]); 
+        write(csock, reply, strlen(reply));
+          
+      }
+      else if (!strcmp(parsedArr[0],"PUT") && cantElems < MAX) {
+        //almacena parsedArr[2] en hash(parsedArr[1])
+        indice = KRHash(parsedArr[1]) % MAX;
+        
+        pthread_mutex_lock(&mutex);
+        tabla[indice] = parsedArr[2];
+        pthread_mutex_unlock(&mutex);
+        cantElems++;
+        sprintf(reply,"%s\n", "OK");
+        write(csock,reply,strlen(reply));
+        
+      }
+      else if (!strcmp(parsedArr[0],"CANT")) {
+        sprintf(reply,"%d\n", cantElems);
+        write(csock,reply,strlen(reply));
+      }
+      else {
+        write(csock,"Error\n",sizeof(char)*7);
+      }
   } 
 }
 
@@ -120,7 +182,7 @@ int mk_lsock()
     quit("setsockopt");
 
   sa.sin_family = AF_INET;
-  sa.sin_port = htons(4040);
+  sa.sin_port = htons(DIR);
   sa.sin_addr.s_addr = htonl(INADDR_ANY);
 
   /* Bindear al puerto 4040 TCP, en todas las direcciones disponibles */
@@ -139,7 +201,7 @@ int mk_lsock()
 int main()
 {
   int lsock;
-  mem = 0;  
+
   // printf("Primer valor: %d\n", *num);
   lsock = mk_lsock();
 
