@@ -1,0 +1,13 @@
+{
+	"C_Cpp.default.compilerPath": "/usr/bin/gcc",
+	"files.associations": {
+		"unistd.h": "c",
+		"string_view": "c",
+		"algorithm": "c",
+		"random": "c",
+		"limits": "c",
+		"numeric": "c",
+		"semaphore.h": "c",
+		"stdio.h": "c"
+	}
+}

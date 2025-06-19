@@ -1,5 +1,6 @@
 ./main : ./lec.o ./readlock.o
 	gcc $^ -o $@ -pthread
+	rm -f ./readlock.o ./lec.o
 
 ./lec.o : ./lec.c ./readlock.h
 	gcc -c $< -o $@ -pthread

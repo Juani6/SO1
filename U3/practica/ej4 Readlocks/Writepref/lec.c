@@ -18,14 +18,12 @@ void* escritor(void* arg) {
     sleep(random() % 3);
     printf("Escritor %d escribiendo\n", num);
     
-    if (readlock_write())
-      perror("ERROR READLOCK WRITE");
+ 	readlock_write();
     
     for (i = 0; i < ARRLEN; i++) 
       arr[i] = num;
     
-    if (readlock_stopWrite())
-      perror("ERROR READLOCK WRITE");
+    readlock_stopWrite();
 
   }
   return NULL;
@@ -38,14 +36,12 @@ void* lector(void* arg) {
   while (1) {
     sleep(random() % 3);
     
-    if (readlock_read())
-      perror("ERROR READLOCK READ");
+    readlock_read();
     
       v = arr[0];
     for(i = 1; i < ARRLEN && arr[i] != v; i++);
     
-    if (readlock_stopRead())
-      perror("ERROR READLOCK READ");
+    readlock_stopRead();
     
       if (i > ARRLEN)
         printf("Lector %d, error de lectura\n",num);
@@ -58,8 +54,7 @@ void* lector(void* arg) {
 int main() {
   pthread_t lectores[M], escritores[N];
   int i;
-  if (readlock_init())
-    perror("INIT");
+  readlock_init();
 
   for (i = 0; i < M; i++) 
     pthread_create(&lectores[i],NULL,lector, i + (void*) 0);
@@ -69,8 +64,7 @@ int main() {
 
   pthread_join(lectores[0],NULL);
   
-  if (readlock_destroy())
-    perror("DESTROY");
+  readlock_destroy();
   
   return 0;  
 }
