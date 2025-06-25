@@ -2,6 +2,8 @@
 -export([recibir/0, enviar/3]).
 
 -define(PORT, 5050).
+-define(BLOCKSIZE, 4096). % Tamanio del bloque a leer en recibir
+
 
 recibir() ->
 	{ok, Lsock} = gen_tcp:listen(?PORT, [binary, {packet, 0}, {active, false}, {reuseaddr, true}]),
@@ -11,9 +13,9 @@ recibir() ->
 	recibir_archivo(Sock),
 	gen_tcp:close(Sock),
 	gen_tcp:close(Lsock).
-
 % file:write_file("archivo_recibido", Bin),
 
+% Recibe inicialmente el tamanio y luego el archivo propiamente dicho
 recibir_archivo(Sock) -> 
 	case gen_tcp:recv(Sock,4) of
 		{ok, <<Size:32/integer-big>>} ->
@@ -23,12 +25,16 @@ recibir_archivo(Sock) ->
 			io:format("Error al recibir Tamanio~n")
 	end.
 
+% Recibe de a BLOCKSIZE los bytes correspondientes al elemento enviado
+% Cuando quedan 0 escribe el archivo
+
 recibir_tam(_Sock,0,Acum) ->
 	file:write_file("archivo_recibido",Acum),
 	io:format("Archivo recibido completo [~p bytes]~n", [byte_size(Acum)]);
+
 recibir_tam(Sock,Restantes,Acum) ->
-	to_read = Restantes,
-	case gen_tcp:recv(Sock, to_read) of
+	ToRead = min(?BLOCKSIZE,Restantes),  
+	case gen_tcp:recv(Sock, ToRead) of
 		{ok, Datos} ->
 			recibir_tam(Sock, Restantes - byte_size(Datos), <<Acum/binary, Datos/binary>>);
 		{error, Reason} ->
@@ -36,7 +42,7 @@ recibir_tam(Sock,Restantes,Acum) ->
 		end.
 
 
-
+% Implementacion del cliente
 enviar(IP, Puerto, RutaArchivo) ->
 	{ok,Bin} = file:read_file(RutaArchivo),
 	Size = byte_size(Bin),
